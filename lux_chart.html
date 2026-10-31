@@ -327,7 +327,8 @@
     <div class="diagramm" id="diagramm"></div>
 
     <div class="diagramm-titel zusatz">
-      <h2>Messzeit über die Zeit</h2>
+      <h2>Messzeit und Gain über die Zeit</h2>
+      <span>links Messzeit · rechts Gain (log.)</span>
     </div>
     <div class="diagramm" id="messzeit"></div>
   </section>
@@ -503,7 +504,7 @@
   function messzeitDiagramm(punkte) {
     const box = $("messzeit");
     box.innerHTML = "";
-    const werte = punkte.filter((p) => Number.isFinite(Number(p.messzeit)));
+    const werte = punkte.filter((p) => Number.isFinite(Number(p.messzeit)) && Number.isFinite(Number(p.gain)));
     if (werte.length < 2) {
       box.innerHTML = '<p class="hinweis">Noch zu wenige Messungen für ein Diagramm.</p>';
       return;
@@ -511,7 +512,7 @@
     const breite = box.clientWidth || 600;
     const schmal = breite < 520;
     const W = breite, H = schmal ? 160 : 180;
-    const L = schmal ? 46 : 60, R = 14, T = 10, B = schmal ? 30 : 34;
+    const L = schmal ? 46 : 60, R = schmal ? 58 : 68, T = 10, B = schmal ? 30 : 34;
     const t0 = werte[0].t.getTime(), t1 = werte[werte.length - 1].t.getTime();
     // Messzeit des Sensors: 100 bis 600 ms in 100-ms-Schritten
     const lo = 100, hi = 600, schritt = 100;
@@ -531,6 +532,19 @@
       return i ? `H${xx}V${yy}` : `M${xx},${yy}`;
     }).join("");
     svgEl("path", { d: `${linie}H${x(t1).toFixed(1)}`, fill: "none", stroke: "var(--series-1)", "stroke-width": 2.25, "stroke-linejoin": "round", filter: `url(#${box.id}-glanz)` }, svg);
+
+    // Gain als zweite Stufenlinie, rechte Skala logarithmisch (1 bis 9876)
+    const yG = (g) => T + (H - T - B) * (1 - Math.log10(g) / Math.log10(9876));
+    for (const g of [1, 25, 428, 9876]) {
+      const t = svgEl("text", { x: W - R + 8, y: yG(g) + 4, "text-anchor": "start", class: "achse" }, svg);
+      t.textContent = "×" + zahl(g);
+    }
+    const gainLinie = werte.map((p, i) => {
+      const xx = x(p.t.getTime()).toFixed(1), yy = yG(Number(p.gain)).toFixed(1);
+      return i ? `H${xx}V${yy}` : `M${xx},${yy}`;
+    }).join("");
+    svgEl("path", { d: `${gainLinie}H${x(t1).toFixed(1)}`, fill: "none", stroke: "var(--good)", "stroke-width": 2, "stroke-dasharray": "5 4", "stroke-linejoin": "round" }, svg);
+
     const beschriftung = (text, xx, anchor) => {
       const t = svgEl("text", { x: xx, y: H - 8, "text-anchor": anchor, class: "achse" }, svg);
       t.textContent = text;
