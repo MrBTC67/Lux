@@ -307,15 +307,14 @@
     <div class="diagramm" id="messzeit"></div>
   </section>
 
-  <footer>Die letzten 24 Stunden, automatische Aktualisierung alle 10 Minuten.</footer>
+  <footer>Alle Messungen seit Messbeginn, automatische Aktualisierung alle 10 Minuten.</footer>
 </main>
 
 <script>
 (function () {
   const BASIS = "https://wetterdaten-98f0f-default-rtdb.europe-west1.firebasedatabase.app";
-  const URL = BASIS + "/Lux.json?orderBy=%22%24key%22&limitToLast=1800";
+  const URL = BASIS + "/Lux.json?orderBy=%22%24key%22";   // alle Messungen, ohne Anzahlbegrenzung
   const INTERVALL_MS = 600000;
-  const FENSTER_MS = 24 * 3600000;   // Zeitachse: höchstens die letzten 24 Stunden
   const UEBERSTEUERT = 65535;   // Kanal 0 bei Sättigung
   const NS = "http://www.w3.org/2000/svg";
   const $ = (id) => document.getElementById(id);
@@ -517,10 +516,8 @@
     try {
       const antwort = await fetch(URL, { cache: "no-store" });
       if (!antwort.ok) throw new Error("HTTP " + antwort.status);
-      // Nur die letzten 24 Stunden, damit Zeitachse, Kacheln und Median denselben Zeitraum zeigen
-      const alle = parse(await antwort.json());
-      const ende = alle.length ? alle[alle.length - 1].t.getTime() : 0;
-      const punkte = alle.filter((p) => p.t.getTime() >= ende - FENSTER_MS);
+      // Alle Messungen seit Messbeginn, damit Zeitachse, Kacheln und Median denselben Zeitraum zeigen
+      const punkte = parse(await antwort.json());
       $("fehler").classList.remove("an");
       if (!punkte.length) {
         $("stand").textContent = "Der Knoten Lux enthält noch keine Messungen.";
