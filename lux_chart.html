@@ -332,18 +332,6 @@
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
 
-  // Autoscale: die Skala passt sich dem Wertebereich an, mit runden Schritten (1, 2, 2,5, 5, 10 x 10^n)
-  function achse(min, max, ziel) {
-    const spanne = Math.max(max - min, 1);
-    const roh = spanne / ziel;
-    const mag = Math.pow(10, Math.floor(Math.log10(roh)));
-    const schritt = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= roh);
-    const lo = Math.floor(min / schritt) * schritt;
-    let hi = Math.ceil(max / schritt) * schritt;
-    if (hi === lo) hi = lo + schritt;
-    return { lo, hi, schritt };
-  }
-
   function parse(obj) {
     return Object.entries(obj || {})
       .map(([key, e]) => ({
@@ -372,8 +360,8 @@
     const W = breite, H = schmal ? 250 : 340;
     const L = schmal ? 46 : 60, R = 14, T = 14, B = schmal ? 34 : 40;
     const t0 = punkte[0].t.getTime(), t1 = punkte[punkte.length - 1].t.getTime();
-    const minV = Math.min(...punkte.map((p) => p.c0)), maxV = Math.max(...punkte.map((p) => p.c0));
-    const { lo, hi, schritt } = achse(minV, maxV, schmal ? 3 : 4);
+    // Feste Skala 0 bis 70000 (Kanal 0 sättigt bei 65535)
+    const lo = 0, hi = 70000, schritt = 10000;
     const x = (ms) => L + (W - L - R) * ((ms - t0) / ((t1 - t0) || 1));
     const y = (v) => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
     const basis = H - B;
