@@ -352,6 +352,21 @@
       .sort((a, b) => a.t - b.t);
   }
 
+  // Autoscale der y-Achse: zu Beginn die volle Skala 0 bis 70000 (Kanal 0 sättigt bei 65535).
+  // Sobald Messwerte da sind, nehmen wir Min und Max der Messwerte, auf runde Schritte gerundet.
+  function skala(punkte) {
+    if (punkte.length < 2) return { lo: 0, hi: 70000, schritt: 10000 };
+    const minV = punkte.reduce((a, p) => Math.min(a, p.c0), Infinity);
+    const maxV = punkte.reduce((a, p) => Math.max(a, p.c0), -Infinity);
+    const roh = Math.max(maxV - minV, 1) / 4;             // etwa vier Abschnitte auf der Achse
+    const mag = Math.pow(10, Math.floor(Math.log10(roh)));
+    const schritt = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= roh);
+    const lo = Math.max(0, Math.floor(minV / schritt) * schritt);
+    let hi = Math.ceil(maxV / schritt) * schritt;
+    if (hi <= lo) hi = lo + schritt;
+    return { lo, hi, schritt };
+  }
+
   function diagramm(punkte) {
     const box = $("diagramm");
     box.innerHTML = "";
@@ -365,8 +380,7 @@
     const W = breite, H = schmal ? 250 : 340;
     const L = schmal ? 46 : 60, R = 14, T = 14, B = schmal ? 34 : 40;
     const t0 = punkte[0].t.getTime(), t1 = punkte[punkte.length - 1].t.getTime();
-    // Feste Skala 0 bis 70000 (Kanal 0 sättigt bei 65535)
-    const lo = 0, hi = 70000, schritt = 10000;
+    const { lo, hi, schritt } = skala(punkte);
     const x = (ms) => L + (W - L - R) * ((ms - t0) / ((t1 - t0) || 1));
     const y = (v) => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
     const basis = H - B;
