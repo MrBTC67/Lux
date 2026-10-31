@@ -322,6 +322,7 @@
   const zahl = (v, n = 0) => (v === null || v === undefined || Number.isNaN(v)) ? "–" :
     Number(v).toLocaleString("de-DE", { minimumFractionDigits: n, maximumFractionDigits: n });
   const uhr = (d) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const uhrSek = (d) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const tagUhr = (d) => d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   function svgEl(tag, attr, parent) {
@@ -398,7 +399,9 @@
     for (let i = 0; i <= ticks; i++) {
       const ms = t0 + (t1 - t0) * (i / ticks), xx = x(ms);
       const t = svgEl("text", { x: xx, y: H - 14, "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle", class: "achse" }, svg);
-      t.textContent = (t1 - t0) > 86400000 ? tagUhr(new Date(ms)) : uhr(new Date(ms));
+      // Bei kurzem Zeitraum reicht Minute nicht, die Beschriftungen würden doppelt erscheinen: dann mit Sekunden
+      const spanne = t1 - t0;
+      t.textContent = spanne > 86400000 ? tagUhr(new Date(ms)) : spanne < 1800000 ? uhrSek(new Date(ms)) : uhr(new Date(ms));
     }
 
     const linie = punkte.map((p, i) => `${i ? "L" : "M"}${x(p.t.getTime()).toFixed(1)},${y(p.c0).toFixed(1)}`).join("");
