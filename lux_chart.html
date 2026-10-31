@@ -322,7 +322,6 @@
   const zahl = (v, n = 0) => (v === null || v === undefined || Number.isNaN(v)) ? "–" :
     Number(v).toLocaleString("de-DE", { minimumFractionDigits: n, maximumFractionDigits: n });
   const uhr = (d) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-  const uhrSek = (d) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const tagUhr = (d) => d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   function svgEl(tag, attr, parent) {
@@ -351,6 +350,26 @@
       }))
       .filter((p) => !Number.isNaN(p.t.getTime()) && !Number.isNaN(p.c0))
       .sort((a, b) => a.t - b.t);
+  }
+
+  // X-Achse: Beschriftungen auf runden Zeiten. Ab zwei Stunden nur volle Stunden, darunter Minuten; nie Sekunden.
+  // Der Stundenschritt wird so gewählt, dass höchstens maxAnzahl Beschriftungen entstehen.
+  function zeitTicks(t0, t1, maxAnzahl) {
+    const spanne = t1 - t0, ticks = [];
+    if (spanne >= 2 * 3600000) {
+      const schritt = [1, 2, 3, 4, 6, 8, 12, 24].find((s) => spanne / (s * 3600000) <= maxAnzahl) || 24;
+      const d = new Date(t0);
+      d.setMinutes(0, 0, 0);
+      while (d.getTime() < t0 || d.getHours() % schritt !== 0) d.setHours(d.getHours() + 1);
+      for (; d.getTime() <= t1; d.setHours(d.getHours() + schritt)) ticks.push(new Date(d));
+    } else {
+      const schritt = [1, 2, 5, 10, 15, 30].find((s) => spanne / (s * 60000) <= maxAnzahl) || 30;
+      const d = new Date(t0);
+      d.setSeconds(0, 0);
+      while (d.getTime() < t0 || d.getMinutes() % schritt !== 0) d.setMinutes(d.getMinutes() + 1);
+      for (; d.getTime() <= t1; d.setMinutes(d.getMinutes() + schritt)) ticks.push(new Date(d));
+    }
+    return ticks;
   }
 
   // Autoscale der y-Achse: zu Beginn die volle Skala 0 bis 70000 (Kanal 0 sättigt bei 65535).
@@ -395,13 +414,11 @@
       t.textContent = zahl(v, schritt < 1 ? 1 : 0);
     }
 
-    const ticks = schmal ? 2 : 5;
-    for (let i = 0; i <= ticks; i++) {
-      const ms = t0 + (t1 - t0) * (i / ticks), xx = x(ms);
-      const t = svgEl("text", { x: xx, y: H - 14, "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle", class: "achse" }, svg);
-      // Bei kurzem Zeitraum reicht Minute nicht, die Beschriftungen würden doppelt erscheinen: dann mit Sekunden
-      const spanne = t1 - t0;
-      t.textContent = spanne > 86400000 ? tagUhr(new Date(ms)) : spanne < 1800000 ? uhrSek(new Date(ms)) : uhr(new Date(ms));
+    for (const d of zeitTicks(t0, t1, schmal ? 3 : 6)) {
+      const xx = x(d.getTime());
+      const anker = xx < L + 30 ? "start" : xx > W - R - 30 ? "end" : "middle";
+      const t = svgEl("text", { x: xx, y: H - 14, "text-anchor": anker, class: "achse" }, svg);
+      t.textContent = t1 - t0 > 86400000 ? tagUhr(d) : uhr(d);
     }
 
     const linie = punkte.map((p, i) => `${i ? "L" : "M"}${x(p.t.getTime()).toFixed(1)},${y(p.c0).toFixed(1)}`).join("");
