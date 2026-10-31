@@ -60,7 +60,11 @@
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    background: var(--page);
+    background:
+      radial-gradient(1100px 620px at 8% -12%, color-mix(in srgb, var(--series-1) 16%, transparent), transparent 62%),
+      radial-gradient(900px 540px at 100% 0%, color-mix(in srgb, var(--series-1) 9%, transparent), transparent 60%),
+      var(--page);
+    background-attachment: fixed;
     color: var(--text-primary);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: 15px;
@@ -98,7 +102,11 @@
     70% { box-shadow: 0 0 0 8px rgba(12, 163, 12, 0); }
     100% { box-shadow: 0 0 0 0 rgba(12, 163, 12, 0); }
   }
-  h1 { font-size: 28px; font-weight: 650; margin: 0; letter-spacing: -0.02em; line-height: 1.15; }
+  h1 {
+    font-size: 28px; font-weight: 650; margin: 0; letter-spacing: -0.02em; line-height: 1.15;
+    background: linear-gradient(115deg, var(--text-primary) 35%, var(--series-1));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
   .sub { color: var(--text-secondary); margin: 6px 0 0; font-size: 14px; }
   .kopf-rechts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -142,7 +150,8 @@
     box-shadow: var(--shadow);
     transition: background-color 160ms ease, border-color 160ms ease;
   }
-  button:hover { background: var(--area); }
+  button:hover { background: var(--area); transform: translateY(-1px); }
+  button:active { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25); }
   button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
   button:disabled { opacity: 0.55; cursor: default; }
 
@@ -160,10 +169,14 @@
 
   /* Karten */
   .card {
-    background: var(--surface-1);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 88%, #fff 12%) 0%, var(--surface-1) 55%);
     border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: var(--shadow);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent),
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 30px 60px -28px rgba(0, 0, 0, 0.35),
+      0 0 0 1px var(--border);
     padding: 28px;
   }
 
@@ -175,6 +188,10 @@
     font-weight: 600;
     letter-spacing: -0.03em;
     line-height: 1;
+    text-shadow:
+      0 1px 0 color-mix(in srgb, var(--series-1) 60%, #000),
+      0 2px 0 color-mix(in srgb, var(--series-1) 40%, #000),
+      0 18px 34px color-mix(in srgb, var(--series-1) 35%, transparent);
   }
   .hero .einheit { font-size: 16px; color: var(--text-secondary); margin-top: 8px; }
   .hero .zeit { color: var(--text-muted); font-size: 13px; text-align: right; }
@@ -189,6 +206,8 @@
     font-size: 13px;
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
+    background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent), 0 4px 10px -6px rgba(0, 0, 0, 0.3);
   }
   .einstell b { color: var(--text-primary); font-weight: 600; }
 
@@ -199,11 +218,17 @@
     margin: 24px 0 28px;
   }
   .kachel {
-    background: var(--page);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--page) 80%, #fff 20%), var(--page));
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 16px 18px;
     min-width: 0;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent), 0 10px 22px -14px rgba(0, 0, 0, 0.4);
+    transition: transform 240ms ease, box-shadow 240ms ease;
+  }
+  .kachel:hover {
+    transform: translateY(-3px) perspective(600px) rotateX(3deg);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent), 0 20px 30px -16px rgba(0, 0, 0, 0.45);
   }
   .kachel .label { color: var(--text-secondary); font-size: 13px; }
   .kachel .wert { font-size: 24px; font-weight: 600; margin-top: 4px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
@@ -387,6 +412,16 @@
     return { lo, hi, schritt };
   }
 
+  // Verlauf für die Fläche und Leuchtfilter für die Linie; jedes Diagramm bekommt eigene IDs
+  function svgDefs(svg, id) {
+    const defs = svgEl("defs", {}, svg);
+    const verlauf = svgEl("linearGradient", { id: id + "-flaeche", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    svgEl("stop", { offset: "0%", style: "stop-color: var(--series-1); stop-opacity: 0.35" }, verlauf);
+    svgEl("stop", { offset: "100%", style: "stop-color: var(--series-1); stop-opacity: 0.02" }, verlauf);
+    const filter = svgEl("filter", { id: id + "-glanz", x: "-5%", y: "-5%", width: "110%", height: "120%" }, defs);
+    svgEl("feDropShadow", { dx: 0, dy: 3, stdDeviation: 3, "flood-opacity": 0.45, style: "flood-color: var(--series-1)" }, filter);
+  }
+
   function diagramm(punkte) {
     const box = $("diagramm");
     box.innerHTML = "";
@@ -406,6 +441,7 @@
     const basis = H - B;
 
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Rohwert Kanal 0 als Liniendiagramm" }, box);
+    svgDefs(svg, box.id);
 
     for (let i = 0; i <= Math.round((hi - lo) / schritt); i++) {
       const v = lo + i * schritt, yy = y(v);
@@ -422,8 +458,8 @@
     }
 
     const linie = punkte.map((p, i) => `${i ? "L" : "M"}${x(p.t.getTime()).toFixed(1)},${y(p.c0).toFixed(1)}`).join("");
-    svgEl("path", { d: `${linie}L${x(t1).toFixed(1)},${basis}L${x(t0).toFixed(1)},${basis}Z`, fill: "var(--area)" }, svg);
-    svgEl("path", { d: linie, fill: "none", stroke: "var(--series-1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    svgEl("path", { d: `${linie}L${x(t1).toFixed(1)},${basis}L${x(t0).toFixed(1)},${basis}Z`, fill: `url(#${box.id}-flaeche)` }, svg);
+    svgEl("path", { d: linie, fill: "none", stroke: "var(--series-1)", "stroke-width": 2.25, "stroke-linejoin": "round", "stroke-linecap": "round", filter: `url(#${box.id}-glanz)` }, svg);
 
     // Letzter Messpunkt, mit Ring in Oberflächenfarbe
     const letzter = punkte[punkte.length - 1];
@@ -483,6 +519,7 @@
     const y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
 
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Messzeit über die Zeit als Stufendiagramm" }, box);
+    svgDefs(svg, box.id);
     for (let v = lo; v <= hi; v += schritt) {
       const yy = y(v);
       svgEl("line", { x1: L, x2: W - R, y1: yy, y2: yy, stroke: v === lo ? "var(--baseline)" : "var(--grid)", "stroke-width": 1 }, svg);
@@ -493,7 +530,7 @@
       const xx = x(p.t.getTime()).toFixed(1), yy = y(Number(p.messzeit)).toFixed(1);
       return i ? `H${xx}V${yy}` : `M${xx},${yy}`;
     }).join("");
-    svgEl("path", { d: `${linie}H${x(t1).toFixed(1)}`, fill: "none", stroke: "var(--series-1)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    svgEl("path", { d: `${linie}H${x(t1).toFixed(1)}`, fill: "none", stroke: "var(--series-1)", "stroke-width": 2.25, "stroke-linejoin": "round", filter: `url(#${box.id}-glanz)` }, svg);
     const beschriftung = (text, xx, anchor) => {
       const t = svgEl("text", { x: xx, y: H - 8, "text-anchor": anchor, class: "achse" }, svg);
       t.textContent = text;
