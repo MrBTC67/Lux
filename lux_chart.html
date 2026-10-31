@@ -536,7 +536,7 @@
     // Gain als zweite Stufenlinie, rechte Skala logarithmisch (1 bis 9876)
     const yG = (g) => T + (H - T - B) * (1 - Math.log10(g) / Math.log10(9876));
     for (const g of [1, 25, 428, 9876]) {
-      const t = svgEl("text", { x: W - R + 8, y: yG(g) + 4, "text-anchor": "start", class: "achse" }, svg);
+      const t = svgEl("text", { x: W - R + 8, y: yG(g) + 4, "text-anchor": "start", class: "achse", style: "fill: var(--good)" }, svg);
       t.textContent = "×" + zahl(g);
     }
     const gainLinie = werte.map((p, i) => {
