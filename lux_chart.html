@@ -234,48 +234,6 @@
 
   footer { color: var(--text-muted); font-size: 12px; margin: 20px 4px 0; }
 
-  /* Gefahrenbereich */
-  .gefahr { color: var(--critical); }
-  .gefahr-bereich {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px 20px;
-    margin-top: 20px;
-    background: transparent;
-    border: 1px dashed var(--border);
-    border-radius: 16px;
-    padding: 18px 22px;
-  }
-  .gefahr-bereich strong { font-size: 14px; font-weight: 600; }
-  .gefahr-bereich p { margin: 2px 0 0; color: var(--text-secondary); font-size: 13px; }
-
-  .dialog-hinter {
-    position: fixed;
-    inset: 0;
-    background: rgba(11, 11, 11, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    z-index: 10;
-  }
-  .dialog-hinter[hidden] { display: none; }
-  .dialog {
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: var(--shadow);
-    padding: 26px;
-    max-width: 420px;
-    width: 100%;
-  }
-  .dialog h2 { font-size: 18px; margin: 0 0 8px; font-weight: 650; }
-  .dialog p { color: var(--text-secondary); font-size: 14px; margin: 0 0 20px; }
-  .dialog-knoepfe { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
-  .dialog-knoepfe button.gefahr { border-color: var(--critical); }
-
   /* Handy */
   @media (max-width: 720px) {
     main { padding: 22px 14px 48px; }
@@ -343,34 +301,15 @@
     <div class="diagramm" id="diagramm"></div>
   </section>
 
-  <footer>Die letzten 1.800 Messungen, automatische Aktualisierung alle 10 Minuten.</footer>
-
-  <section class="gefahr-bereich">
-    <div>
-      <strong>Messdaten löschen</strong>
-      <p>Entfernt den gesamten Knoten Lux aus der Datenbank. Das lässt sich nicht rückgängig machen.</p>
-    </div>
-    <button id="loeschen-oeffnen" type="button" class="gefahr">Daten löschen …</button>
-  </section>
+  <footer>Die letzten 24 Stunden, automatische Aktualisierung alle 10 Minuten.</footer>
 </main>
-
-<div class="dialog-hinter" id="dialog" hidden>
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-titel">
-    <h2 id="dialog-titel">Alle Messungen löschen?</h2>
-    <p>Der gesamte Knoten <code>Lux</code> wird dauerhaft gelöscht. Der ESP32 schreibt danach wieder neue Werte, sobald er läuft. Mit „Ja, löschen“ bestätigen.</p>
-    <div class="dialog-knoepfe">
-      <button id="dialog-abbrechen" type="button">Abbrechen</button>
-      <button id="dialog-loeschen" type="button" class="gefahr">Ja, löschen</button>
-    </div>
-  </div>
-</div>
 
 <script>
 (function () {
   const BASIS = "https://wetterdaten-98f0f-default-rtdb.europe-west1.firebasedatabase.app";
   const URL = BASIS + "/Lux.json?orderBy=%22%24key%22&limitToLast=1800";
-  const LUX_URL = BASIS + "/Lux.json";
   const INTERVALL_MS = 600000;
+  const FENSTER_MS = 24 * 3600000;   // Zeitachse: höchstens die letzten 24 Stunden
   const UEBERSTEUERT = 65535;   // Kanal 0 bei Sättigung
   const NS = "http://www.w3.org/2000/svg";
   const $ = (id) => document.getElementById(id);
@@ -543,7 +482,10 @@
     try {
       const antwort = await fetch(URL, { cache: "no-store" });
       if (!antwort.ok) throw new Error("HTTP " + antwort.status);
-      const punkte = parse(await antwort.json());
+      // Nur die letzten 24 Stunden, damit Zeitachse, Kacheln und Median denselben Zeitraum zeigen
+      const alle = parse(await antwort.json());
+      const ende = alle.length ? alle[alle.length - 1].t.getTime() : 0;
+      const punkte = alle.filter((p) => p.t.getTime() >= ende - FENSTER_MS);
       $("fehler").classList.remove("an");
       if (!punkte.length) {
         $("stand").textContent = "Der Knoten Lux enthält noch keine Messungen.";
@@ -566,38 +508,6 @@
       knopf.disabled = false;
     }
   }
-
-  function dialogOeffnen() {
-    $("dialog").hidden = false;
-    $("dialog-loeschen").disabled = false;
-    $("dialog-loeschen").focus();
-  }
-
-  function dialogSchliessen() {
-    $("dialog").hidden = true;
-  }
-
-  async function loeschen() {
-    const knopf = $("dialog-loeschen");
-    knopf.disabled = true;
-    try {
-      const antwort = await fetch(LUX_URL, { method: "DELETE" });
-      if (!antwort.ok) throw new Error("HTTP " + antwort.status);
-      dialogSchliessen();
-      await laden();
-    } catch (e) {
-      const f = $("fehler");
-      f.textContent = "Löschen fehlgeschlagen (" + e.message + "). Bitte in der Firebase-Konsole prüfen, was im Knoten Lux steht.";
-      f.classList.add("an");
-      knopf.disabled = false;
-    }
-  }
-
-  $("loeschen-oeffnen").addEventListener("click", dialogOeffnen);
-  $("dialog-abbrechen").addEventListener("click", dialogSchliessen);
-  $("dialog").addEventListener("click", (e) => { if (e.target.id === "dialog") dialogSchliessen(); });
-  $("dialog-loeschen").addEventListener("click", loeschen);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("dialog").hidden) dialogSchliessen(); });
 
   // Hell/Dunkel: ohne Wahl folgt die Seite der Systemeinstellung, die Wahl wird im Browser gemerkt
   const THEMA_SCHLUESSEL = "lux-thema";
