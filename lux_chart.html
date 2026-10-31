@@ -232,6 +232,7 @@
   .tipp .t { color: var(--text-muted); font-size: 12px; }
   .tipp strong { font-weight: 600; font-variant-numeric: tabular-nums; }
 
+  .zusatz { margin-top: 28px; }
   footer { color: var(--text-muted); font-size: 12px; margin: 20px 4px 0; }
 
   /* Handy */
@@ -299,6 +300,11 @@
       <span id="zeitraum"></span>
     </div>
     <div class="diagramm" id="diagramm"></div>
+
+    <div class="diagramm-titel zusatz">
+      <h2>Messzeit über die Zeit</h2>
+    </div>
+    <div class="diagramm" id="messzeit"></div>
   </section>
 
   <footer>Die letzten 24 Stunden, automatische Aktualisierung alle 10 Minuten.</footer>
@@ -424,6 +430,45 @@
     });
   }
 
+  // Messzeit über die Zeit als Stufenlinie, damit sichtbar ist, wann der Sensor die Messzeit geändert hat
+  function messzeitDiagramm(punkte) {
+    const box = $("messzeit");
+    box.innerHTML = "";
+    const werte = punkte.filter((p) => Number.isFinite(Number(p.messzeit)));
+    if (werte.length < 2) {
+      box.innerHTML = '<p class="hinweis">Noch zu wenige Messungen für ein Diagramm.</p>';
+      return;
+    }
+    const breite = box.clientWidth || 600;
+    const schmal = breite < 520;
+    const W = breite, H = schmal ? 160 : 180;
+    const L = schmal ? 46 : 60, R = 14, T = 10, B = schmal ? 30 : 34;
+    const t0 = werte[0].t.getTime(), t1 = werte[werte.length - 1].t.getTime();
+    // Messzeit des Sensors: 100 bis 600 ms in 100-ms-Schritten
+    const lo = 100, hi = 600, schritt = 100;
+    const x = (ms) => L + (W - L - R) * ((ms - t0) / ((t1 - t0) || 1));
+    const y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Messzeit über die Zeit als Stufendiagramm" }, box);
+    for (let v = lo; v <= hi; v += schritt) {
+      const yy = y(v);
+      svgEl("line", { x1: L, x2: W - R, y1: yy, y2: yy, stroke: v === lo ? "var(--baseline)" : "var(--grid)", "stroke-width": 1 }, svg);
+      const t = svgEl("text", { x: L - 8, y: yy + 4, "text-anchor": "end", class: "achse" }, svg);
+      t.textContent = zahl(v);
+    }
+    const linie = werte.map((p, i) => {
+      const xx = x(p.t.getTime()).toFixed(1), yy = y(Number(p.messzeit)).toFixed(1);
+      return i ? `H${xx}V${yy}` : `M${xx},${yy}`;
+    }).join("");
+    svgEl("path", { d: `${linie}H${x(t1).toFixed(1)}`, fill: "none", stroke: "var(--series-1)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    const beschriftung = (text, xx, anchor) => {
+      const t = svgEl("text", { x: xx, y: H - 8, "text-anchor": anchor, class: "achse" }, svg);
+      t.textContent = text;
+    };
+    beschriftung(tagUhr(werte[0].t), L, "start");
+    beschriftung(tagUhr(werte[werte.length - 1].t), W - R, "end");
+  }
+
   function kacheln(punkte) {
     const letzter = punkte[punkte.length - 1];
     $("aktuell").textContent = letzter ? zahl(letzter.c0) : "–";
@@ -459,7 +504,9 @@
       }
       const chip = (text) => { const s = document.createElement("span"); s.innerHTML = text; einstell.appendChild(s); };
       chip(`Gain <b>×${zahl(letzter.gain)}</b>`);
+      const zeiten = [...new Set(punkte.map((p) => p.messzeit))].sort((a, b) => a - b);
       chip(`T (Messzeit) <b>${zahl(letzter.messzeit)} ms</b>`);
+      if (zeiten.length > 1) chip(`Messzeiten <b>${zeiten.map((z) => zahl(z)).join(" · ")} ms</b>`);
       if (kombis.size > 1) chip(`⚠ im Zeitraum ${zahl(kombis.size)} verschiedene Einstellungen`);
     }
   }
@@ -480,6 +527,7 @@
         $("zeitraum").textContent = "";
         kacheln(punkte);
         diagramm(punkte);
+        messzeitDiagramm(punkte);
         return;
       }
       const t0 = punkte[0].t, t1 = punkte[punkte.length - 1].t;
@@ -488,6 +536,7 @@
       datenCache = punkte;
       kacheln(punkte);
       diagramm(punkte);
+      messzeitDiagramm(punkte);
     } catch (e) {
       const f = $("fehler");
       f.textContent = "Daten konnten nicht geladen werden (" + e.message + "). Der nächste Versuch ist in 10 Minuten.";
@@ -525,7 +574,7 @@
   let resizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (datenCache) diagramm(datenCache); }, 150);
+    resizeTimer = setTimeout(() => { if (datenCache) { diagramm(datenCache); messzeitDiagramm(datenCache); } }, 150);
   });
 
   $("neu").addEventListener("click", laden);
