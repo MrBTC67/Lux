@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rohwert-Verlauf</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f6f6f3;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e6e5df;
+    --baseline: #c3c2b7;
+    --series-1: #2a78d6;
+    --area: rgba(42, 120, 214, 0.10);
+    --border: rgba(11, 11, 11, 0.08);
+    --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 12px 32px -12px rgba(11, 11, 11, 0.10);
+    --critical: #d03b3b;
+    --good: #0ca30c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface-1: #1a1a19;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2a2a28;
+      --baseline: #383835;
+      --series-1: #3987e5;
+      --area: rgba(57, 135, 229, 0.14);
+      --border: rgba(255, 255, 255, 0.08);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -12px rgba(0, 0, 0, 0.5);
+      --critical: #e66767;
+      --good: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2a2a28;
+    --baseline: #383835;
+    --series-1: #3987e5;
+    --area: rgba(57, 135, 229, 0.14);
+    --border: rgba(255, 255, 255, 0.08);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -12px rgba(0, 0, 0, 0.5);
+    --critical: #e66767;
+    --good: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+  main { max-width: 1000px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  /* Kopfzeile */
+  .kopf {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px 24px;
+    margin-bottom: 24px;
+  }
+  .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .live .punkt {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--good);
+    box-shadow: 0 0 0 0 rgba(12, 163, 12, 0.5);
+    animation: puls 2.4s ease-out infinite;
+  }
+  @keyframes puls {
+    0% { box-shadow: 0 0 0 0 rgba(12, 163, 12, 0.45); }
+    70% { box-shadow: 0 0 0 8px rgba(12, 163, 12, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(12, 163, 12, 0); }
+  }
+  h1 { font-size: 28px; font-weight: 650; margin: 0; letter-spacing: -0.02em; line-height: 1.15; }
+  .sub { color: var(--text-secondary); margin: 6px 0 0; font-size: 14px; }
+  .kopf-rechts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .thema {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-1);
+    box-shadow: var(--shadow);
+  }
+  .thema button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-radius: 999px;
+  }
+  .thema button svg { width: 14px; height: 14px; }
+  .thema button[aria-pressed="true"] {
+    background: var(--area);
+    color: var(--series-1);
+    font-weight: 600;
+  }
+
+  button {
+    font: inherit;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 16px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: background-color 160ms ease, border-color 160ms ease;
+  }
+  button:hover { background: var(--area); }
+  button:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+  button:disabled { opacity: 0.55; cursor: default; }
+
+  .fehler {
+    display: none;
+    border: 1px solid var(--critical);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+  .fehler.an { display: block; }
+
+  /* Karten */
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 28px;
+  }
+
+  .hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+  .hero .links { min-width: 0; }
+  .hero .bezeichnung { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+  .hero .zahl {
+    font-size: 72px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .hero .einheit { font-size: 16px; color: var(--text-secondary); margin-top: 8px; }
+  .hero .zeit { color: var(--text-muted); font-size: 13px; text-align: right; }
+  .hinweis { color: var(--text-secondary); font-size: 13px; margin: 10px 0 0; }
+  .hinweis.warn { color: var(--text-primary); }
+
+  .einstell { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  .einstell span {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .einstell b { color: var(--text-primary); font-weight: 600; }
+
+  .kacheln {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 24px 0 28px;
+  }
+  .kachel {
+    background: var(--page);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    min-width: 0;
+  }
+  .kachel .label { color: var(--text-secondary); font-size: 13px; }
+  .kachel .wert { font-size: 24px; font-weight: 600; margin-top: 4px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .kachel .detail { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+  .diagramm-titel { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .diagramm-titel h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .diagramm-titel span { color: var(--text-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .diagramm { position: relative; width: 100%; }
+  .diagramm svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+  .diagramm text { fill: var(--text-secondary); font-size: 12px; }
+  .diagramm .achse { fill: var(--text-muted); }
+  .tipp {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+    box-shadow: var(--shadow);
+    transform: translate(-50%, -125%);
+    display: none;
+  }
+  .tipp .t { color: var(--text-muted); font-size: 12px; }
+  .tipp strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  footer { color: var(--text-muted); font-size: 12px; margin: 20px 4px 0; }
+
+  /* Gefahrenbereich */
+  .gefahr { color: var(--critical); }
+  .gefahr-bereich {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    margin-top: 20px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 16px;
+    padding: 18px 22px;
+  }
+  .gefahr-bereich strong { font-size: 14px; font-weight: 600; }
+  .gefahr-bereich p { margin: 2px 0 0; color: var(--text-secondary); font-size: 13px; }
+
+  .dialog-hinter {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 11, 11, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 10;
+  }
+  .dialog-hinter[hidden] { display: none; }
+  .dialog {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 26px;
+    max-width: 420px;
+    width: 100%;
+  }
+  .dialog h2 { font-size: 18px; margin: 0 0 8px; font-weight: 650; }
+  .dialog p { color: var(--text-secondary); font-size: 14px; margin: 0 0 20px; }
+  .dialog-knoepfe { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+  .dialog-knoepfe button.gefahr { border-color: var(--critical); }
+
+  /* Handy */
+  @media (max-width: 720px) {
+    main { padding: 22px 14px 48px; }
+    h1 { font-size: 24px; }
+    .card { padding: 20px; border-radius: 16px; }
+    .hero .zahl { font-size: 56px; }
+    .hero .zeit { text-align: left; }
+    .kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .kachel .wert { font-size: 20px; }
+    .diagramm text { font-size: 13px; }
+  }
+  @media (max-width: 420px) {
+    .thema button .text-lang { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="kopf">
+    <div>
+      <div class="live"><span class="punkt" aria-hidden="true"></span><span id="stand">Lade Daten …</span></div>
+      <h1>Rohwert-Verlauf</h1>
+      <p class="sub">Kanal 0 des TSL2591 · Firebase-Knoten Lux</p>
+    </div>
+    <div class="kopf-rechts">
+      <div class="thema" role="group" aria-label="Darstellung">
+        <button type="button" data-thema="light" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <span class="text-lang">Hell</span>
+        </button>
+        <button type="button" data-thema="dark" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <span class="text-lang">Dunkel</span>
+        </button>
+      </div>
+      <button id="neu" type="button">Aktualisieren</button>
+    </div>
+  </header>
+
+  <div class="fehler" id="fehler" role="alert"></div>
+
+  <section class="card">
+    <div class="hero">
+      <div class="links">
+        <div class="bezeichnung">Aktuell · Kanal 0</div>
+        <div class="zahl" id="aktuell">–</div>
+        <div class="einheit">Counts</div>
+      </div>
+      <div class="zeit" id="aktuell-zeit"></div>
+    </div>
+    <p class="hinweis" id="aktuell-hinweis"></p>
+    <div class="einstell" id="einstell"></div>
+
+    <div class="kacheln">
+      <div class="kachel"><div class="label">Minimum</div><div class="wert" id="min">–</div><div class="detail" id="min-zeit"></div></div>
+      <div class="kachel"><div class="label">Maximum</div><div class="wert" id="max">–</div><div class="detail" id="max-zeit"></div></div>
+      <div class="kachel"><div class="label">Median</div><div class="wert" id="median">–</div><div class="detail">über den Zeitraum</div></div>
+      <div class="kachel"><div class="label">Messungen</div><div class="wert" id="anzahl">–</div><div class="detail" id="ueber"></div></div>
+    </div>
+
+    <div class="diagramm-titel">
+      <h2>Kanal 0 über die Zeit</h2>
+      <span id="zeitraum"></span>
+    </div>
+    <div class="diagramm" id="diagramm"></div>
+  </section>
+
+  <footer>Die letzten 1.800 Messungen, automatische Aktualisierung alle 10 Minuten.</footer>
+
+  <section class="gefahr-bereich">
+    <div>
+      <strong>Messdaten löschen</strong>
+      <p>Entfernt den gesamten Knoten Lux aus der Datenbank. Das lässt sich nicht rückgängig machen.</p>
+    </div>
+    <button id="loeschen-oeffnen" type="button" class="gefahr">Daten löschen …</button>
+  </section>
+</main>
+
+<div class="dialog-hinter" id="dialog" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-titel">
+    <h2 id="dialog-titel">Alle Messungen löschen?</h2>
+    <p>Der gesamte Knoten <code>Lux</code> wird dauerhaft gelöscht. Der ESP32 schreibt danach wieder neue Werte, sobald er läuft. Mit „Ja, löschen“ bestätigen.</p>
+    <div class="dialog-knoepfe">
+      <button id="dialog-abbrechen" type="button">Abbrechen</button>
+      <button id="dialog-loeschen" type="button" class="gefahr">Ja, löschen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const BASIS = "https://wetterdaten-98f0f-default-rtdb.europe-west1.firebasedatabase.app";
+  const URL = BASIS + "/Lux.json?orderBy=%22%24key%22&limitToLast=1800";
+  const LUX_URL = BASIS + "/Lux.json";
+  const INTERVALL_MS = 600000;
+  const UEBERSTEUERT = 65535;   // Kanal 0 bei Sättigung
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = (id) => document.getElementById(id);
+
+  const zahl = (v, n = 0) => (v === null || v === undefined || Number.isNaN(v)) ? "–" :
+    Number(v).toLocaleString("de-DE", { minimumFractionDigits: n, maximumFractionDigits: n });
+  const uhr = (d) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const tagUhr = (d) => d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  function svgEl(tag, attr, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attr) e.setAttribute(k, attr[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  function median(werte) {
+    const s = [...werte].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  // Autoscale: die Skala passt sich dem Wertebereich an, mit runden Schritten (1, 2, 2,5, 5, 10 x 10^n)
+  function achse(min, max, ziel) {
+    const spanne = Math.max(max - min, 1);
+    const roh = spanne / ziel;
+    const mag = Math.pow(10, Math.floor(Math.log10(roh)));
+    const schritt = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((s) => s >= roh);
+    const lo = Math.floor(min / schritt) * schritt;
+    let hi = Math.ceil(max / schritt) * schritt;
+    if (hi === lo) hi = lo + schritt;
+    return { lo, hi, schritt };
+  }
+
+  function parse(obj) {
+    return Object.entries(obj || {})
+      .map(([key, e]) => ({
+        key,
+        t: new Date(e.zeit),
+        c0: Number(e.c0),
+        c1: Number(e.c1),
+        gain: e.gain,
+        messzeit: e.messzeit_ms,
+        ueber: !!e.ueber || e.c0 === UEBERSTEUERT,
+      }))
+      .filter((p) => !Number.isNaN(p.t.getTime()) && !Number.isNaN(p.c0))
+      .sort((a, b) => a.t - b.t);
+  }
+
+  function diagramm(punkte) {
+    const box = $("diagramm");
+    box.innerHTML = "";
+    if (punkte.length < 2) {
+      box.innerHTML = '<p class="hinweis">Noch zu wenige Messungen für ein Diagramm.</p>';
+      return;
+    }
+    // Größe in echten Pixeln, damit Schrift und Beschriftung auf dem Handy nicht verkleinert werden
+    const breite = box.clientWidth || 600;
+    const schmal = breite < 520;
+    const W = breite, H = schmal ? 250 : 340;
+    const L = schmal ? 46 : 60, R = 14, T = 14, B = schmal ? 34 : 40;
+    const t0 = punkte[0].t.getTime(), t1 = punkte[punkte.length - 1].t.getTime();
+    const minV = Math.min(...punkte.map((p) => p.c0)), maxV = Math.max(...punkte.map((p) => p.c0));
+    const { lo, hi, schritt } = achse(minV, maxV, schmal ? 3 : 4);
+    const x = (ms) => L + (W - L - R) * ((ms - t0) / ((t1 - t0) || 1));
+    const y = (v) => T + (H - T - B) * (1 - (v - lo) / ((hi - lo) || 1));
+    const basis = H - B;
+
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Rohwert Kanal 0 als Liniendiagramm" }, box);
+
+    for (let i = 0; i <= Math.round((hi - lo) / schritt); i++) {
+      const v = lo + i * schritt, yy = y(v);
+      svgEl("line", { x1: L, x2: W - R, y1: yy, y2: yy, stroke: i === 0 ? "var(--baseline)" : "var(--grid)", "stroke-width": 1 }, svg);
+      const t = svgEl("text", { x: L - 8, y: yy + 4, "text-anchor": "end", class: "achse" }, svg);
+      t.textContent = zahl(v, schritt < 1 ? 1 : 0);
+    }
+
+    const ticks = schmal ? 2 : 5;
+    for (let i = 0; i <= ticks; i++) {
+      const ms = t0 + (t1 - t0) * (i / ticks), xx = x(ms);
+      const t = svgEl("text", { x: xx, y: H - 14, "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle", class: "achse" }, svg);
+      t.textContent = (t1 - t0) > 86400000 ? tagUhr(new Date(ms)) : uhr(new Date(ms));
+    }
+
+    const linie = punkte.map((p, i) => `${i ? "L" : "M"}${x(p.t.getTime()).toFixed(1)},${y(p.c0).toFixed(1)}`).join("");
+    svgEl("path", { d: `${linie}L${x(t1).toFixed(1)},${basis}L${x(t0).toFixed(1)},${basis}Z`, fill: "var(--area)" }, svg);
+    svgEl("path", { d: linie, fill: "none", stroke: "var(--series-1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+
+    // Letzter Messpunkt, mit Ring in Oberflächenfarbe
+    const letzter = punkte[punkte.length - 1];
+    svgEl("circle", { cx: x(t1), cy: y(letzter.c0), r: 4.5, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+
+    const fade = svgEl("line", { x1: 0, x2: 0, y1: T, y2: basis, stroke: "var(--baseline)", "stroke-width": 1, visibility: "hidden" }, svg);
+    const dot = svgEl("circle", { r: 5, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2, visibility: "hidden" }, svg);
+    const hit = svgEl("rect", { x: L, y: T, width: W - L - R, height: basis - T, fill: "transparent" }, svg);
+    const tip = document.createElement("div");
+    tip.className = "tipp";
+    box.appendChild(tip);
+
+    hit.addEventListener("mousemove", (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * W;
+      const ms = t0 + (px - L) / (W - L - R) * (t1 - t0);
+      let best = punkte[0], bestD = Infinity;
+      for (const p of punkte) {
+        const d = Math.abs(p.t.getTime() - ms);
+        if (d < bestD) { bestD = d; best = p; }
+      }
+      const xx = x(best.t.getTime()), yy = y(best.c0);
+      fade.setAttribute("x1", xx); fade.setAttribute("x2", xx); fade.setAttribute("visibility", "visible");
+      dot.setAttribute("cx", xx); dot.setAttribute("cy", yy); dot.setAttribute("visibility", "visible");
+      tip.innerHTML = `<div class="t">${tagUhr(best.t)}</div>` +
+        `<strong>Kanal 0: ${zahl(best.c0)}</strong> · Kanal 1: ${zahl(best.c1)}` +
+        (best.ueber ? " · übersteuert" : "");
+      const rel = r.width / W;
+      tip.style.left = (xx * rel) + "px";
+      tip.style.top = (yy * rel) + "px";
+      tip.style.display = "block";
+    });
+    hit.addEventListener("mouseleave", () => {
+      fade.setAttribute("visibility", "hidden");
+      dot.setAttribute("visibility", "hidden");
+      tip.style.display = "none";
+    });
+  }
+
+  function kacheln(punkte) {
+    const letzter = punkte[punkte.length - 1];
+    $("aktuell").textContent = letzter ? zahl(letzter.c0) : "–";
+    $("aktuell-zeit").textContent = letzter ? `gemessen ${tagUhr(letzter.t)}` : "";
+    $("aktuell-hinweis").textContent = letzter && letzter.ueber ? "⚠ Sensor übersteuert, der Messbereich sollte kleiner werden." : "";
+    $("aktuell-hinweis").classList.toggle("warn", !!(letzter && letzter.ueber));
+
+    if (!punkte.length) {
+      for (const id of ["min", "max", "median"]) $(id).textContent = "–";
+      $("min-zeit").textContent = "";
+      $("max-zeit").textContent = "";
+    } else {
+      const mi = punkte.reduce((a, b) => (b.c0 < a.c0 ? b : a));
+      const ma = punkte.reduce((a, b) => (b.c0 > a.c0 ? b : a));
+      $("min").textContent = zahl(mi.c0);
+      $("min-zeit").textContent = tagUhr(mi.t);
+      $("max").textContent = zahl(ma.c0);
+      $("max-zeit").textContent = tagUhr(ma.t);
+      $("median").textContent = zahl(median(punkte.map((p) => p.c0)));
+    }
+    $("anzahl").textContent = zahl(punkte.length);
+    const ueber = punkte.filter((p) => p.ueber).length;
+    $("ueber").textContent = `${zahl(ueber)} übersteuert`;
+
+    // Gain und Messzeit T des letzten Eintrags, dazu Hinweis, falls sich die Einstellung im Zeitraum geändert hat
+    const einstell = $("einstell");
+    einstell.innerHTML = "";
+    if (letzter) {
+      const kombis = new Map();
+      for (const p of punkte) {
+        const k = `${p.gain}|${p.messzeit}`;
+        kombis.set(k, (kombis.get(k) || 0) + 1);
+      }
+      const chip = (text) => { const s = document.createElement("span"); s.innerHTML = text; einstell.appendChild(s); };
+      chip(`Gain <b>×${zahl(letzter.gain)}</b>`);
+      chip(`T (Messzeit) <b>${zahl(letzter.messzeit)} ms</b>`);
+      if (kombis.size > 1) chip(`⚠ im Zeitraum ${zahl(kombis.size)} verschiedene Einstellungen`);
+    }
+  }
+
+  async function laden() {
+    const knopf = $("neu");
+    knopf.disabled = true;
+    try {
+      const antwort = await fetch(URL, { cache: "no-store" });
+      if (!antwort.ok) throw new Error("HTTP " + antwort.status);
+      const punkte = parse(await antwort.json());
+      $("fehler").classList.remove("an");
+      if (!punkte.length) {
+        $("stand").textContent = "Der Knoten Lux enthält noch keine Messungen.";
+        $("zeitraum").textContent = "";
+        kacheln(punkte);
+        diagramm(punkte);
+        return;
+      }
+      const t0 = punkte[0].t, t1 = punkte[punkte.length - 1].t;
+      $("zeitraum").textContent = `${tagUhr(t0)} bis ${tagUhr(t1)}`;
+      $("stand").textContent = `Aktualisiert ${uhr(new Date())} · ${zahl(punkte.length)} Messungen`;
+      datenCache = punkte;
+      kacheln(punkte);
+      diagramm(punkte);
+    } catch (e) {
+      const f = $("fehler");
+      f.textContent = "Daten konnten nicht geladen werden (" + e.message + "). Der nächste Versuch ist in 10 Minuten.";
+      f.classList.add("an");
+    } finally {
+      knopf.disabled = false;
+    }
+  }
+
+  function dialogOeffnen() {
+    $("dialog").hidden = false;
+    $("dialog-loeschen").disabled = false;
+    $("dialog-loeschen").focus();
+  }
+
+  function dialogSchliessen() {
+    $("dialog").hidden = true;
+  }
+
+  async function loeschen() {
+    const knopf = $("dialog-loeschen");
+    knopf.disabled = true;
+    try {
+      const antwort = await fetch(LUX_URL, { method: "DELETE" });
+      if (!antwort.ok) throw new Error("HTTP " + antwort.status);
+      dialogSchliessen();
+      await laden();
+    } catch (e) {
+      const f = $("fehler");
+      f.textContent = "Löschen fehlgeschlagen (" + e.message + "). Bitte in der Firebase-Konsole prüfen, was im Knoten Lux steht.";
+      f.classList.add("an");
+      knopf.disabled = false;
+    }
+  }
+
+  $("loeschen-oeffnen").addEventListener("click", dialogOeffnen);
+  $("dialog-abbrechen").addEventListener("click", dialogSchliessen);
+  $("dialog").addEventListener("click", (e) => { if (e.target.id === "dialog") dialogSchliessen(); });
+  $("dialog-loeschen").addEventListener("click", loeschen);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("dialog").hidden) dialogSchliessen(); });
+
+  // Hell/Dunkel: ohne Wahl folgt die Seite der Systemeinstellung, die Wahl wird im Browser gemerkt
+  const THEMA_SCHLUESSEL = "lux-thema";
+  function themaAnzeigen(thema) {
+    document.querySelectorAll("[data-thema]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.thema === thema));
+    });
+  }
+  function themaSetzen(thema) {
+    document.documentElement.dataset.theme = thema;
+    themaAnzeigen(thema);
+    try { localStorage.setItem(THEMA_SCHLUESSEL, thema); } catch (e) { /* Speicher nicht verfügbar, dann nur für diesen Besuch */ }
+  }
+  let gespeichert = null;
+  try { gespeichert = localStorage.getItem(THEMA_SCHLUESSEL); } catch (e) { /* kein Zugriff, Systemeinstellung */ }
+  if (gespeichert === "light" || gespeichert === "dark") {
+    themaSetzen(gespeichert);
+  } else {
+    themaAnzeigen(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  }
+  document.querySelectorAll("[data-thema]").forEach((b) => {
+    b.addEventListener("click", () => themaSetzen(b.dataset.thema));
+  });
+
+  // Beim Drehen oder Verkleinern des Fensters neu zeichnen, damit die Größe stimmt
+  let datenCache = null;
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (datenCache) diagramm(datenCache); }, 150);
+  });
+
+  $("neu").addEventListener("click", laden);
+  laden();
+  setInterval(laden, INTERVALL_MS);
+})();
+</script>
+</body>
+</html>
